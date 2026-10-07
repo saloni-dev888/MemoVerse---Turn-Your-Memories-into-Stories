@@ -1,96 +1,451 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, Sparkles, X } from "lucide-react";
 import api from "../services/api";
 
-const types = [
-  ["story", "Story", "A warm, detailed narrative"],
-  ["poetry", "Poetry", "Emotional free-verse poem"],
-  ["magazine", "Magazine", "A stylish memory spread"],
-  ["short-book", "Short Book", "A mini book with chapters"]
+const TYPES = [
+  {
+    value: "story",
+    icon: "📖",
+    title: "Story Book",
+    description:
+      "Turn your memories into a beautifully written story with chapters, emotions and visual moments.",
+  },
+  {
+    value: "poetry",
+    icon: "✨",
+    title: "Poetry",
+    description:
+      "Transform feelings and memories into genuine poetry with imagery, rhythm and emotion.",
+  },
+  {
+    value: "magazine",
+    icon: "📰",
+    title: "Magazine",
+    description:
+      "Create a personal magazine with cover, editorial, highlights, photo stories and timeline.",
+  },
 ];
+
+const MAX_IMAGES = 50;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export default function CreateMemory() {
   const navigate = useNavigate();
+
   const [form, setForm] = useState({
-    title: "", date: "", location: "", people: "", description: "", outputType: "story"
+    title: "",
+    date: "",
+    location: "",
+    people: "",
+    description: "",
+    outputType: "story",
   });
+
   const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  /*
+    Add photos in multiple batches.
+    New selection is appended instead of replacing old photos.
+  */
+  const handleImages = (e) => {
+    const selected = Array.from(e.target.files || []);
+
+    if (!selected.length) return;
+
     setError("");
-    setLoading(true);
+
+    const validImages = [];
+    const invalidImages = [];
+
+    selected.forEach((file) => {
+      if (!file.type.startsWith("image/")) {
+        invalidImages.push(`${file.name} is not an image.`);
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        invalidImages.push(
+          `${file.name} is larger than 5 MB.`
+        );
+        return;
+      }
+
+      validImages.push(file);
+    });
+
+    setImages((previous) => {
+      const remaining =
+        MAX_IMAGES - previous.length;
+
+      if (remaining <= 0) {
+        return previous;
+      }
+
+      return [
+        ...previous,
+        ...validImages.slice(0, remaining),
+      ];
+    });
+
+    if (invalidImages.length) {
+      setError(
+        invalidImages.slice(0, 3).join(" ")
+      );
+    }
+
+    /*
+      Reset input so selecting the same photo again
+      can trigger onChange.
+    */
+    e.target.value = "";
+  };
+
+  const removeImage = (index) => {
+    setImages((previous) =>
+      previous.filter((_, i) => i !== index)
+    );
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    setError("");
+
+    if (!form.title.trim()) {
+      setError("Please enter a memory title.");
+      return;
+    }
+
+    if (!form.description.trim()) {
+      setError(
+        "Please describe your memory before generating it."
+      );
+      return;
+    }
 
     try {
-      const data = new FormData();
-      Object.entries(form).forEach(([key, value]) => data.append(key, value));
-      images.forEach(file => data.append("images", file));
+      setIsSubmitting(true);
 
-      const response = await api.post("/memories", data, {
-        headers: { "Content-Type": "multipart/form-data" }
+      const data = new FormData();
+
+      data.append("title", form.title);
+      data.append("date", form.date);
+      data.append("location", form.location);
+      data.append("people", form.people);
+      data.append("description", form.description);
+      data.append("outputType", form.outputType);
+
+      images.forEach((image) => {
+        data.append("images", image);
       });
-      navigate(`/memory/${response.data._id}`);
+
+      /*
+        Create the memory first.
+      */
+      const response = await api.post(
+        "/memories",
+        data,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      const memory = response.data;
+
+      /*
+        Then ask AI to generate the creative version.
+      */
+      await api.post(
+        `/memories/${memory._id}/generate`
+      );
+
+      navigate(`/memories/${memory._id}`);
     } catch (err) {
-      setError(err.response?.data?.message || "Could not create memory");
+      console.error(err);
+
+      setError(
+        err?.response?.data?.message ||
+          "Something went wrong while creating your memory."
+      );
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="app-shell">
-      <div className="form-container">
-        <div className="page-heading">
-          <div className="eyebrow"><Sparkles size={14}/> CREATE A MEMORY</div>
-          <h1>Tell us what happened.</h1>
-          <p>Don't worry about writing perfectly. Give the AI your real details and let it shape the memory.</p>
+    <main className="create-memory-page">
+      <div className="create-memory-header">
+        <div>
+          <span className="eyebrow">
+            CREATE A MEMORY
+          </span>
+
+          <h1>Give your memories a new life.</h1>
+
+          <p>
+            Tell us what happened. The AI will understand
+            the emotions, people and moments before turning
+            them into your chosen format.
+          </p>
         </div>
+      </div>
 
-        {error && <div className="error-box">{error}</div>}
+      {error && (
+        <div className="form-error">
+          {error}
+        </div>
+      )}
 
-        <form onSubmit={submit} className="memory-form">
-          <div className="form-section">
-            <h3>1. The moment</h3>
-            <div className="two-col">
-              <label>Memory title<input required value={form.title} onChange={e => setForm({...form,title:e.target.value})} placeholder="Our last college trip" /></label>
-              <label>Date<input type="date" value={form.date} onChange={e => setForm({...form,date:e.target.value})} /></label>
+      <form
+        className="memory-form"
+        onSubmit={handleSubmit}
+      >
+        {/* FORMAT */}
+        <section className="form-section">
+          <div className="section-heading">
+            <span>01</span>
+
+            <div>
+              <h2>Choose your format</h2>
+              <p>
+                How would you like your memory to be
+                remembered?
+              </p>
             </div>
-            <div className="two-col">
-              <label>Location<input value={form.location} onChange={e => setForm({...form,location:e.target.value})} placeholder="Lucknow, Uttar Pradesh" /></label>
-              <label>People<input value={form.people} onChange={e => setForm({...form,people:e.target.value})} placeholder="Akansha, Madhavi, Sahil..." /></label>
-            </div>
-            <label>What happened?<textarea required rows="8" value={form.description} onChange={e => setForm({...form,description:e.target.value})} placeholder="Write everything you remember — what happened, who was there, funny moments, emotions, small details…"/></label>
           </div>
 
-          <div className="form-section">
-            <h3>2. Add photos</h3>
-            <label className="upload-box">
-              <Upload size={25}/>
-              <strong>Choose photos</strong>
-              <span>JPG, PNG or WEBP · up to 8 photos</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e => setImages(Array.from(e.target.files || []))}/>
+          <div className="memory-type-grid">
+            {TYPES.map((type) => (
+              <button
+                type="button"
+                key={type.value}
+                className={`memory-type-card ${
+                  form.outputType === type.value
+                    ? "selected"
+                    : ""
+                }`}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    outputType: type.value,
+                  }))
+                }
+              >
+                <span className="memory-type-icon">
+                  {type.icon}
+                </span>
+
+                <strong>{type.title}</strong>
+
+                <span>
+                  {type.description}
+                </span>
+
+                {form.outputType ===
+                  type.value && (
+                  <span className="selected-badge">
+                    Selected
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* BASIC DETAILS */}
+        <section className="form-section">
+          <div className="section-heading">
+            <span>02</span>
+
+            <div>
+              <h2>Tell us about it</h2>
+              <p>
+                Share as much detail as you remember.
+              </p>
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <label className="form-field full">
+              <span>Memory title *</span>
+
+              <input
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                placeholder="e.g. The Summer We Never Wanted to End"
+                maxLength={200}
+              />
             </label>
-            {images.length > 0 && <div className="file-list">{images.map((x,i)=><div key={i}>{x.name}<button type="button" onClick={()=>setImages(images.filter((_,n)=>n!==i))}><X size={14}/></button></div>)}</div>}
+
+            <label className="form-field">
+              <span>Date</span>
+
+              <input
+                type="date"
+                name="date"
+                value={form.date}
+                onChange={handleChange}
+              />
+            </label>
+
+            <label className="form-field">
+              <span>Location</span>
+
+              <input
+                name="location"
+                value={form.location}
+                onChange={handleChange}
+                placeholder="e.g. College campus"
+              />
+            </label>
+
+            <label className="form-field full">
+              <span>People</span>
+
+              <input
+                name="people"
+                value={form.people}
+                onChange={handleChange}
+                placeholder="e.g. Anshu, Riya, Aman"
+              />
+
+              <small>
+                Separate multiple names with commas.
+              </small>
+            </label>
+
+            <label className="form-field full">
+              <span>Your memory *</span>
+
+              <textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="Write naturally. Tell the AI what happened, who was there, how you felt, important moments, funny incidents, small details..."
+                rows={12}
+              />
+
+              <small>
+                Don't worry about writing perfectly.
+                Just tell the memory naturally.
+              </small>
+            </label>
+          </div>
+        </section>
+
+        {/* PHOTOS */}
+        <section className="form-section">
+          <div className="section-heading">
+            <span>03</span>
+
+            <div>
+              <h2>Add your photographs</h2>
+
+              <p>
+                Add up to 50 photos. You can select them
+                in multiple batches.
+              </p>
+            </div>
           </div>
 
-          <div className="form-section">
-            <h3>3. What should we create?</h3>
-            <div className="output-options">
-              {types.map(([value, title, desc]) => (
-                <label key={value} className={`output-option ${form.outputType === value ? "selected" : ""}`}>
-                  <input type="radio" name="outputType" value={value} checked={form.outputType === value} onChange={e=>setForm({...form,outputType:e.target.value})}/>
-                  <strong>{title}</strong><span>{desc}</span>
-                </label>
+          <label className="photo-upload-box">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={handleImages}
+              disabled={images.length >= MAX_IMAGES}
+            />
+
+            <span className="upload-icon">
+              ＋
+            </span>
+
+            <strong>
+              {images.length >= MAX_IMAGES
+                ? "50 photos added"
+                : "Add photographs"}
+            </strong>
+
+            <span>
+              JPG, PNG or WEBP · Maximum 5 MB each
+            </span>
+
+            <span>
+              {images.length}/{MAX_IMAGES} selected
+            </span>
+          </label>
+
+          {images.length > 0 && (
+            <div className="photo-preview-grid">
+              {images.map((image, index) => (
+                <div
+                  className="photo-preview"
+                  key={`${image.name}-${index}`}
+                >
+                  <img
+                    src={URL.createObjectURL(image)}
+                    alt={image.name}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeImage(index)
+                    }
+                    aria-label={`Remove ${image.name}`}
+                  >
+                    ×
+                  </button>
+
+                  <span>
+                    {index + 1}
+                  </span>
+                </div>
               ))}
             </div>
+          )}
+        </section>
+
+        {/* SUBMIT */}
+        <section className="create-action">
+          <div>
+            <strong>
+              Ready to turn this memory into something
+              special?
+            </strong>
+
+            <span>
+              AI will understand your memory first and
+              then create the selected format.
+            </span>
           </div>
 
-          <button disabled={loading} className="primary-btn large full">{loading ? "Creating…" : "Create Memory Page ✦"}</button>
-        </form>
-      </div>
-    </div>
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={isSubmitting}
+          >
+            {isSubmitting
+              ? "Creating your memory..."
+              : "Create Memory ✨"}
+          </button>
+        </section>
+      </form>
+    </main>
   );
 }
