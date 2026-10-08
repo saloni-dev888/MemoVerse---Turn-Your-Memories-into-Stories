@@ -58,6 +58,7 @@ export default function CreateMemory() {
     people: "",
     description: "",
     outputType: "story",
+    language: "English",
   });
 
   const [images, setImages] = useState([]);
@@ -174,11 +175,9 @@ export default function CreateMemory() {
   return (
     <div className="app-shell">
       <div className="create-modern-page">
-
         {/* ================= HEADER ================= */}
 
         <header className="create-modern-header">
-
           <div className="create-modern-kicker">
             <span className="kicker-icon">
               <Sparkles size={14} />
@@ -201,7 +200,6 @@ export default function CreateMemory() {
           {/* Progress */}
 
           <div className="create-progress">
-
             <div className="progress-step active">
               <span>01</span>
               <div>
@@ -229,7 +227,6 @@ export default function CreateMemory() {
                 <small>Choose the feeling</small>
               </div>
             </div>
-
           </div>
         </header>
 
@@ -241,38 +238,28 @@ export default function CreateMemory() {
         )}
 
         <form onSubmit={submit}>
-
           <div className="create-modern-layout">
-
             {/* ================= MAIN FORM ================= */}
 
             <main className="create-main">
-
               {/* MEMORY */}
 
               <section className="create-modern-section">
-
                 <div className="modern-section-heading">
-
-                  <div className="section-number">
-                    01
-                  </div>
+                  <div className="section-number">01</div>
 
                   <div>
                     <span>THE MEMORY</span>
                     <h2>Start with what really happened.</h2>
                     <p>
-                      Don't worry about writing perfectly. Just tell it
-                      like you're telling a friend.
+                      Don't worry about writing perfectly. Just tell it like
+                      you're telling a friend.
                     </p>
                   </div>
-
                 </div>
 
                 <div className="modern-form-card">
-
                   <div className="modern-two-col">
-
                     <label className="modern-field">
                       <span>
                         Memory title <b>*</b>
@@ -303,11 +290,9 @@ export default function CreateMemory() {
                         />
                       </div>
                     </label>
-
                   </div>
 
                   <div className="modern-two-col">
-
                     <label className="modern-field">
                       <span>Location</span>
 
@@ -339,19 +324,15 @@ export default function CreateMemory() {
                         />
                       </div>
                     </label>
-
                   </div>
 
                   <label className="modern-field">
-
                     <div className="textarea-heading">
                       <span>
                         Tell the memory in your own words <b>*</b>
                       </span>
 
-                      <small>
-                        {form.description.length} characters
-                      </small>
+                      <small>{form.description.length} characters</small>
                     </div>
 
                     <textarea
@@ -363,7 +344,6 @@ export default function CreateMemory() {
                       }
                       placeholder="What happened? Who was there? What made you laugh? Was there a small moment you'll never forget? What were you feeling? Tell us everything you remember..."
                     />
-
                   </label>
 
                   <div className="ai-writing-tip">
@@ -378,34 +358,24 @@ export default function CreateMemory() {
                       personal your final creation will feel.
                     </p>
                   </div>
-
                 </div>
-
               </section>
-
 
               {/* PHOTOS */}
 
               <section className="create-modern-section">
-
                 <div className="modern-section-heading">
-
-                  <div className="section-number">
-                    02
-                  </div>
+                  <div className="section-number">02</div>
 
                   <div>
                     <span>THE VISUAL MEMORY</span>
                     <h2>Bring the moments to life.</h2>
-                    <p>
-                      Add photographs that belong to this memory.
-                    </p>
+                    <p>Add photographs that belong to this memory.</p>
                   </div>
 
                   <strong className="modern-photo-count">
                     {images.length}/{MAX_IMAGES}
                   </strong>
-
                 </div>
 
                 <label
@@ -419,7 +389,6 @@ export default function CreateMemory() {
                   onDragLeave={() => setDragging(false)}
                   onDrop={handleDrop}
                 >
-
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -444,18 +413,15 @@ export default function CreateMemory() {
                   <small>
                     JPG, PNG or WEBP · Maximum 5 MB each · Up to 50 photos
                   </small>
-
                 </label>
 
                 {previews.length > 0 && (
                   <div className="modern-photo-grid">
-
                     {previews.map(({ file, url }, index) => (
                       <div
                         className="modern-photo"
                         key={`${file.name}-${index}`}
                       >
-
                         <img src={url} alt={file.name} />
 
                         <span className="photo-number">
@@ -469,7 +435,6 @@ export default function CreateMemory() {
                         >
                           <X size={14} />
                         </button>
-
                       </div>
                     ))}
 
@@ -487,22 +452,15 @@ export default function CreateMemory() {
                         <span>Add more</span>
                       </label>
                     )}
-
                   </div>
                 )}
-
               </section>
-
 
               {/* FORMAT */}
 
               <section className="create-modern-section">
-
                 <div className="modern-section-heading">
-
-                  <div className="section-number">
-                    03
-                  </div>
+                  <div className="section-number">03</div>
 
                   <div>
                     <span>CREATIVE FORMAT</span>
@@ -511,13 +469,10 @@ export default function CreateMemory() {
                       Choose the form that best matches the memory.
                     </p>
                   </div>
-
                 </div>
 
                 <div className="modern-format-grid">
-
                   {types.map((type) => {
-
                     const Icon = type.icon;
 
                     const selected =
@@ -530,7 +485,6 @@ export default function CreateMemory() {
                           selected ? "selected" : ""
                         }`}
                       >
-
                         <input
                           type="radio"
                           name="outputType"
@@ -545,7 +499,6 @@ export default function CreateMemory() {
                         />
 
                         <div className="format-top">
-
                           <span className="format-number">
                             {type.number}
                           </span>
@@ -557,10 +510,12 @@ export default function CreateMemory() {
                               <Icon size={19} />
                             )}
                           </span>
-
                         </div>
 
-                        <Icon className="format-main-icon" size={28} />
+                        <Icon
+                          className="format-main-icon"
+                          size={28}
+                        />
 
                         <h3>{type.title}</h3>
 
@@ -571,20 +526,91 @@ export default function CreateMemory() {
                         <div className="format-arrow">
                           <ArrowRight size={16} />
                         </div>
-
                       </label>
                     );
                   })}
-
                 </div>
 
-              </section>
+                {/* ================= LANGUAGE ================= */}
 
+                <div className="language-selector">
+                  <div className="language-selector-heading">
+                    <span>LANGUAGE</span>
+
+                    <h3>How should your memory be written?</h3>
+
+                    <p>
+                      Choose the language for your AI-generated creation.
+                    </p>
+                  </div>
+
+                  <div className="language-options">
+                    <label
+                      className={`language-option ${
+                        form.language === "English"
+                          ? "selected"
+                          : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="language"
+                        value="English"
+                        checked={form.language === "English"}
+                        onChange={(e) =>
+                          updateField(
+                            "language",
+                            e.target.value
+                          )
+                        }
+                      />
+
+                      <span className="language-flag">
+                        🇬🇧
+                      </span>
+
+                      <span>
+                        <strong>English</strong>
+                        <small>Creative English</small>
+                      </span>
+                    </label>
+
+                    <label
+                      className={`language-option ${
+                        form.language === "Hindi"
+                          ? "selected"
+                          : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="language"
+                        value="Hindi"
+                        checked={form.language === "Hindi"}
+                        onChange={(e) =>
+                          updateField(
+                            "language",
+                            e.target.value
+                          )
+                        }
+                      />
+
+                      <span className="language-flag">
+                        🇮🇳
+                      </span>
+
+                      <span>
+                        <strong>हिंदी</strong>
+                        <small>रचनात्मक हिंदी</small>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </section>
 
               {/* CREATE */}
 
               <section className="create-final-card">
-
                 <div className="final-spark">
                   <Sparkles size={22} />
                 </div>
@@ -608,7 +634,6 @@ export default function CreateMemory() {
                   disabled={loading}
                   className="ai-create-button"
                 >
-
                   {loading ? (
                     <>
                       <span className="ai-spinner" />
@@ -621,32 +646,25 @@ export default function CreateMemory() {
                       <span>✦</span>
                     </>
                   )}
-
                 </button>
-
               </section>
-
             </main>
-
 
             {/* ================= LIVE PREVIEW ================= */}
 
             <aside className="memory-live-preview">
-
               <div className="live-preview-label">
                 <span className="live-dot" />
                 LIVE PREVIEW
               </div>
 
               <div className="preview-paper">
-
                 <div className="preview-paper-top">
                   <span>MEMORYBOOK</span>
                   <Sparkles size={13} />
                 </div>
 
                 <div className="preview-cover">
-
                   {previews.length > 0 ? (
                     <img
                       src={previews[0].url}
@@ -660,17 +678,17 @@ export default function CreateMemory() {
                   )}
 
                   <div className="preview-overlay">
-                    <small>{selectedFormat.title.toUpperCase()}</small>
+                    <small>
+                      {selectedFormat.title.toUpperCase()}
+                    </small>
 
                     <h3>
                       {form.title || "Your memory title"}
                     </h3>
                   </div>
-
                 </div>
 
                 <div className="preview-details">
-
                   {form.date && (
                     <div>
                       <CalendarDays size={13} />
@@ -691,7 +709,6 @@ export default function CreateMemory() {
                       {form.people}
                     </div>
                   )}
-
                 </div>
 
                 <div className="preview-description">
@@ -716,14 +733,14 @@ export default function CreateMemory() {
 
                 <div className="preview-footer">
                   <span>
-                    {images.length} {images.length === 1 ? "photo" : "photos"}
+                    {images.length}{" "}
+                    {images.length === 1 ? "photo" : "photos"}
                   </span>
 
                   <span>✦</span>
 
                   <span>{selectedFormat.title}</span>
                 </div>
-
               </div>
 
               <div className="preview-note">
@@ -731,11 +748,8 @@ export default function CreateMemory() {
                 Your final creation will be generated from
                 everything you share here.
               </div>
-
             </aside>
-
           </div>
-
         </form>
       </div>
     </div>
@@ -743,9 +757,5 @@ export default function CreateMemory() {
 }
 
 function PlusIcon() {
-  return (
-    <span className="plus-icon">
-      +
-    </span>
-  );
+  return <span className="plus-icon">+</span>;
 }

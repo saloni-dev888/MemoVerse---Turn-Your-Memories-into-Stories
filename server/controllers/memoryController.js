@@ -2,6 +2,7 @@ const Memory = require("../models/Memory");
 const { generateMemory } = require("../services/aiService");
 
 const ALLOWED_TYPES = ["story", "poetry", "magazine"];
+const ALLOWED_LANGUAGES = ["English", "Hindi"];
 
 const parsePeople = (people) => {
   if (Array.isArray(people)) {
@@ -47,8 +48,11 @@ const parseGeneratedResult = (result) => {
 };
 
 /*
-  CREATE MEMORY
+|--------------------------------------------------------------------------
+| CREATE MEMORY
+|--------------------------------------------------------------------------
 */
+
 exports.create = async (req, res) => {
   try {
     const {
@@ -58,6 +62,7 @@ exports.create = async (req, res) => {
       people,
       description,
       outputType,
+      language,
     } = req.body;
 
     if (!title || !description || !outputType) {
@@ -74,6 +79,11 @@ exports.create = async (req, res) => {
       });
     }
 
+    const selectedLanguage =
+      ALLOWED_LANGUAGES.includes(language)
+        ? language
+        : "English";
+
     const parsedPeople = parsePeople(people);
 
     const images = (req.files || []).map((file) => ({
@@ -83,13 +93,24 @@ exports.create = async (req, res) => {
 
     const memory = await Memory.create({
       user: req.user.id,
+
       title: title.trim(),
+
       date: date || undefined,
-      location: location?.trim() || undefined,
+
+      location:
+        location?.trim() || undefined,
+
       people: parsedPeople,
+
       description: description.trim(),
+
       images,
+
       outputType,
+
+      language: selectedLanguage,
+
       status: "draft",
     });
 
@@ -98,14 +119,19 @@ exports.create = async (req, res) => {
     console.error("Create memory error:", error);
 
     res.status(500).json({
-      message: error.message || "Failed to create memory.",
+      message:
+        error.message ||
+        "Failed to create memory.",
     });
   }
 };
 
 /*
-  GENERATE AI MEMORY
+|--------------------------------------------------------------------------
+| GENERATE AI MEMORY
+|--------------------------------------------------------------------------
 */
+
 exports.generate = async (req, res) => {
   try {
     const memory = await Memory.findOne({
@@ -121,28 +147,46 @@ exports.generate = async (req, res) => {
 
     const result = await generateMemory({
       title: memory.title,
+
       date: memory.date,
+
       location: memory.location,
+
       people: memory.people,
+
       description: memory.description,
+
       outputType: memory.outputType,
+
+      language:
+        memory.language || "English",
+
       images: memory.images,
     });
 
-    const parsed = parseGeneratedResult(result);
+    const parsed =
+      parseGeneratedResult(result);
 
     memory.generatedTitle =
-      parsed.title?.trim() || memory.title;
+      parsed.title?.trim() ||
+      memory.title;
 
-    memory.generatedContent = parsed.content || "";
-    memory.generatedData = parsed.data || null;
+    memory.generatedContent =
+      parsed.content || "";
+
+    memory.generatedData =
+      parsed.data || null;
+
     memory.status = "generated";
 
     await memory.save();
 
     res.json(memory);
   } catch (error) {
-    console.error("Generate memory error:", error);
+    console.error(
+      "Generate memory error:",
+      error
+    );
 
     res.status(500).json({
       message:
@@ -153,8 +197,11 @@ exports.generate = async (req, res) => {
 };
 
 /*
-  LIST USER MEMORIES
+|--------------------------------------------------------------------------
+| LIST USER MEMORIES
+|--------------------------------------------------------------------------
 */
+
 exports.list = async (req, res) => {
   try {
     const memories = await Memory.find({
@@ -165,17 +212,25 @@ exports.list = async (req, res) => {
 
     res.json(memories);
   } catch (error) {
-    console.error("List memories error:", error);
+    console.error(
+      "List memories error:",
+      error
+    );
 
     res.status(500).json({
-      message: error.message || "Failed to fetch memories.",
+      message:
+        error.message ||
+        "Failed to fetch memories.",
     });
   }
 };
 
 /*
-  GET ONE MEMORY
+|--------------------------------------------------------------------------
+| GET ONE MEMORY
+|--------------------------------------------------------------------------
 */
+
 exports.getOne = async (req, res) => {
   try {
     const memory = await Memory.findOne({
@@ -191,23 +246,32 @@ exports.getOne = async (req, res) => {
 
     res.json(memory);
   } catch (error) {
-    console.error("Get memory error:", error);
+    console.error(
+      "Get memory error:",
+      error
+    );
 
     res.status(500).json({
-      message: error.message || "Failed to fetch memory.",
+      message:
+        error.message ||
+        "Failed to fetch memory.",
     });
   }
 };
 
 /*
-  DELETE MEMORY
+|--------------------------------------------------------------------------
+| DELETE MEMORY
+|--------------------------------------------------------------------------
 */
+
 exports.remove = async (req, res) => {
   try {
-    const deleted = await Memory.findOneAndDelete({
-      _id: req.params.id,
-      user: req.user.id,
-    });
+    const deleted =
+      await Memory.findOneAndDelete({
+        _id: req.params.id,
+        user: req.user.id,
+      });
 
     if (!deleted) {
       return res.status(404).json({
@@ -216,13 +280,19 @@ exports.remove = async (req, res) => {
     }
 
     res.json({
-      message: "Memory deleted successfully.",
+      message:
+        "Memory deleted successfully.",
     });
   } catch (error) {
-    console.error("Delete memory error:", error);
+    console.error(
+      "Delete memory error:",
+      error
+    );
 
     res.status(500).json({
-      message: error.message || "Failed to delete memory.",
+      message:
+        error.message ||
+        "Failed to delete memory.",
     });
   }
 };
