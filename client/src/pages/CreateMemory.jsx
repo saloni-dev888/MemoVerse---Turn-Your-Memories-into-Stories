@@ -1,33 +1,52 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Upload,
+  Sparkles,
+  X,
+  ImagePlus,
+  BookOpen,
+  PenLine,
+  Newspaper,
+  CheckCircle2,
+  MapPin,
+  Users,
+  CalendarDays,
+  ArrowRight,
+  WandSparkles,
+  Heart,
+} from "lucide-react";
+
 import api from "../services/api";
 
-const TYPES = [
+const types = [
   {
     value: "story",
-    icon: "📖",
     title: "Story Book",
-    description:
-      "Turn your memories into a beautifully written story with chapters, emotions and visual moments.",
+    short: "A beautiful story",
+    desc: "Turn your memory into a cinematic story with scenes, emotions and chapters.",
+    icon: BookOpen,
+    number: "01",
   },
   {
     value: "poetry",
-    icon: "✨",
     title: "Poetry",
-    description:
-      "Transform feelings and memories into genuine poetry with imagery, rhythm and emotion.",
+    short: "Feel it in words",
+    desc: "Transform the emotion behind your memory into genuine original poetry.",
+    icon: PenLine,
+    number: "02",
   },
   {
     value: "magazine",
-    icon: "📰",
     title: "Magazine",
-    description:
-      "Create a personal magazine with cover, editorial, highlights, photo stories and timeline.",
+    short: "Your memory issue",
+    desc: "Create an editorial-style magazine with highlights, photos and timeline.",
+    icon: Newspaper,
+    number: "03",
   },
 ];
 
 const MAX_IMAGES = 50;
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 export default function CreateMemory() {
   const navigate = useNavigate();
@@ -42,410 +61,691 @@ export default function CreateMemory() {
   });
 
   const [images, setImages] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const previews = useMemo(
+    () =>
+      images.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+      })),
+    [images]
+  );
 
+  const selectedFormat =
+    types.find((item) => item.value === form.outputType) || types[0];
+
+  const updateField = (field, value) => {
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      [field]: value,
     }));
   };
 
-  /*
-    Add photos in multiple batches.
-    New selection is appended instead of replacing old photos.
-  */
-  const handleImages = (e) => {
-    const selected = Array.from(e.target.files || []);
+  const addFiles = (fileList) => {
+    const selected = Array.from(fileList || []).filter((file) =>
+      ["image/jpeg", "image/png", "image/webp"].includes(file.type)
+    );
 
     if (!selected.length) return;
 
-    setError("");
+    const available = MAX_IMAGES - images.length;
 
-    const validImages = [];
-    const invalidImages = [];
-
-    selected.forEach((file) => {
-      if (!file.type.startsWith("image/")) {
-        invalidImages.push(`${file.name} is not an image.`);
-        return;
-      }
-
-      if (file.size > MAX_FILE_SIZE) {
-        invalidImages.push(
-          `${file.name} is larger than 5 MB.`
-        );
-        return;
-      }
-
-      validImages.push(file);
-    });
-
-    setImages((previous) => {
-      const remaining =
-        MAX_IMAGES - previous.length;
-
-      if (remaining <= 0) {
-        return previous;
-      }
-
-      return [
-        ...previous,
-        ...validImages.slice(0, remaining),
-      ];
-    });
-
-    if (invalidImages.length) {
-      setError(
-        invalidImages.slice(0, 3).join(" ")
-      );
+    if (available <= 0) {
+      setError(`You can add up to ${MAX_IMAGES} photos.`);
+      return;
     }
 
-    /*
-      Reset input so selecting the same photo again
-      can trigger onChange.
-    */
+    const accepted = selected
+      .filter((file) => file.size <= 5 * 1024 * 1024)
+      .slice(0, available);
+
+    setImages((prev) => [...prev, ...accepted]);
+    setError("");
+  };
+
+  const handleFileChange = (e) => {
+    addFiles(e.target.files);
     e.target.value = "";
   };
 
   const removeImage = (index) => {
-    setImages((previous) =>
-      previous.filter((_, i) => i !== index)
-    );
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e) => {
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    addFiles(e.dataTransfer.files);
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
 
     setError("");
 
     if (!form.title.trim()) {
-      setError("Please enter a memory title.");
+      setError("Please give your memory a title.");
       return;
     }
 
     if (!form.description.trim()) {
-      setError(
-        "Please describe your memory before generating it."
-      );
+      setError("Please tell us what happened in your own words.");
       return;
     }
 
-    try {
-      setIsSubmitting(true);
+    if (images.length > MAX_IMAGES) {
+      setError(`You can add up to ${MAX_IMAGES} photos.`);
+      return;
+    }
 
+    setLoading(true);
+
+    try {
       const data = new FormData();
 
-      data.append("title", form.title);
-      data.append("date", form.date);
-      data.append("location", form.location);
-      data.append("people", form.people);
-      data.append("description", form.description);
-      data.append("outputType", form.outputType);
-
-      images.forEach((image) => {
-        data.append("images", image);
+      Object.entries(form).forEach(([key, value]) => {
+        data.append(key, value);
       });
 
-      /*
-        Create the memory first.
-      */
-      const response = await api.post(
-        "/memories",
-        data,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      images.forEach((file) => {
+        data.append("images", file);
+      });
 
-      const memory = response.data;
+      const response = await api.post("/memories", data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-      /*
-        Then ask AI to generate the creative version.
-      */
-      await api.post(
-        `/memories/${memory._id}/generate`
-      );
-
-      navigate(`/memories/${memory._id}`);
+      navigate(`/memory/${response.data._id}`);
     } catch (err) {
-      console.error(err);
-
       setError(
-        err?.response?.data?.message ||
-          "Something went wrong while creating your memory."
+        err.response?.data?.message ||
+          "Could not create memory. Please try again."
       );
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <main className="create-memory-page">
-      <div className="create-memory-header">
-        <div>
-          <span className="eyebrow">
-            CREATE A MEMORY
-          </span>
+    <div className="app-shell">
+      <div className="create-modern-page">
 
-          <h1>Give your memories a new life.</h1>
+        {/* ================= HEADER ================= */}
+
+        <header className="create-modern-header">
+
+          <div className="create-modern-kicker">
+            <span className="kicker-icon">
+              <Sparkles size={14} />
+            </span>
+            MEMORY CREATOR
+          </div>
+
+          <h1>
+            Give your memories
+            <br />
+            <em>a life of their own.</em>
+          </h1>
 
           <p>
-            Tell us what happened. The AI will understand
-            the emotions, people and moments before turning
-            them into your chosen format.
+            Tell us what happened naturally. We'll understand the people,
+            emotions and little details before turning them into something
+            worth revisiting.
           </p>
-        </div>
-      </div>
 
-      {error && (
-        <div className="form-error">
-          {error}
-        </div>
-      )}
+          {/* Progress */}
 
-      <form
-        className="memory-form"
-        onSubmit={handleSubmit}
-      >
-        {/* FORMAT */}
-        <section className="form-section">
-          <div className="section-heading">
-            <span>01</span>
+          <div className="create-progress">
 
-            <div>
-              <h2>Choose your format</h2>
-              <p>
-                How would you like your memory to be
-                remembered?
-              </p>
+            <div className="progress-step active">
+              <span>01</span>
+              <div>
+                <strong>Your memory</strong>
+                <small>Tell us what happened</small>
+              </div>
             </div>
-          </div>
 
-          <div className="memory-type-grid">
-            {TYPES.map((type) => (
-              <button
-                type="button"
-                key={type.value}
-                className={`memory-type-card ${
-                  form.outputType === type.value
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    outputType: type.value,
-                  }))
-                }
-              >
-                <span className="memory-type-icon">
-                  {type.icon}
-                </span>
+            <div className="progress-line" />
 
-                <strong>{type.title}</strong>
-
-                <span>
-                  {type.description}
-                </span>
-
-                {form.outputType ===
-                  type.value && (
-                  <span className="selected-badge">
-                    Selected
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* BASIC DETAILS */}
-        <section className="form-section">
-          <div className="section-heading">
-            <span>02</span>
-
-            <div>
-              <h2>Tell us about it</h2>
-              <p>
-                Share as much detail as you remember.
-              </p>
+            <div className="progress-step">
+              <span>02</span>
+              <div>
+                <strong>Your photos</strong>
+                <small>Add the moments</small>
+              </div>
             </div>
-          </div>
 
-          <div className="form-grid">
-            <label className="form-field full">
-              <span>Memory title *</span>
+            <div className="progress-line" />
 
-              <input
-                name="title"
-                value={form.title}
-                onChange={handleChange}
-                placeholder="e.g. The Summer We Never Wanted to End"
-                maxLength={200}
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Date</span>
-
-              <input
-                type="date"
-                name="date"
-                value={form.date}
-                onChange={handleChange}
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Location</span>
-
-              <input
-                name="location"
-                value={form.location}
-                onChange={handleChange}
-                placeholder="e.g. College campus"
-              />
-            </label>
-
-            <label className="form-field full">
-              <span>People</span>
-
-              <input
-                name="people"
-                value={form.people}
-                onChange={handleChange}
-                placeholder="e.g. Anshu, Riya, Aman"
-              />
-
-              <small>
-                Separate multiple names with commas.
-              </small>
-            </label>
-
-            <label className="form-field full">
-              <span>Your memory *</span>
-
-              <textarea
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                placeholder="Write naturally. Tell the AI what happened, who was there, how you felt, important moments, funny incidents, small details..."
-                rows={12}
-              />
-
-              <small>
-                Don't worry about writing perfectly.
-                Just tell the memory naturally.
-              </small>
-            </label>
-          </div>
-        </section>
-
-        {/* PHOTOS */}
-        <section className="form-section">
-          <div className="section-heading">
-            <span>03</span>
-
-            <div>
-              <h2>Add your photographs</h2>
-
-              <p>
-                Add up to 50 photos. You can select them
-                in multiple batches.
-              </p>
+            <div className="progress-step">
+              <span>03</span>
+              <div>
+                <strong>Your format</strong>
+                <small>Choose the feeling</small>
+              </div>
             </div>
+
           </div>
+        </header>
 
-          <label className="photo-upload-box">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              onChange={handleImages}
-              disabled={images.length >= MAX_IMAGES}
-            />
+        {error && (
+          <div className="create-error">
+            <span>!</span>
+            {error}
+          </div>
+        )}
 
-            <span className="upload-icon">
-              ＋
-            </span>
+        <form onSubmit={submit}>
 
-            <strong>
-              {images.length >= MAX_IMAGES
-                ? "50 photos added"
-                : "Add photographs"}
-            </strong>
+          <div className="create-modern-layout">
 
-            <span>
-              JPG, PNG or WEBP · Maximum 5 MB each
-            </span>
+            {/* ================= MAIN FORM ================= */}
 
-            <span>
-              {images.length}/{MAX_IMAGES} selected
-            </span>
-          </label>
+            <main className="create-main">
 
-          {images.length > 0 && (
-            <div className="photo-preview-grid">
-              {images.map((image, index) => (
-                <div
-                  className="photo-preview"
-                  key={`${image.name}-${index}`}
+              {/* MEMORY */}
+
+              <section className="create-modern-section">
+
+                <div className="modern-section-heading">
+
+                  <div className="section-number">
+                    01
+                  </div>
+
+                  <div>
+                    <span>THE MEMORY</span>
+                    <h2>Start with what really happened.</h2>
+                    <p>
+                      Don't worry about writing perfectly. Just tell it
+                      like you're telling a friend.
+                    </p>
+                  </div>
+
+                </div>
+
+                <div className="modern-form-card">
+
+                  <div className="modern-two-col">
+
+                    <label className="modern-field">
+                      <span>
+                        Memory title <b>*</b>
+                      </span>
+
+                      <input
+                        required
+                        value={form.title}
+                        onChange={(e) =>
+                          updateField("title", e.target.value)
+                        }
+                        placeholder="The summer we never wanted to end"
+                      />
+                    </label>
+
+                    <label className="modern-field">
+                      <span>Date</span>
+
+                      <div className="input-with-icon">
+                        <CalendarDays size={17} />
+
+                        <input
+                          type="date"
+                          value={form.date}
+                          onChange={(e) =>
+                            updateField("date", e.target.value)
+                          }
+                        />
+                      </div>
+                    </label>
+
+                  </div>
+
+                  <div className="modern-two-col">
+
+                    <label className="modern-field">
+                      <span>Location</span>
+
+                      <div className="input-with-icon">
+                        <MapPin size={17} />
+
+                        <input
+                          value={form.location}
+                          onChange={(e) =>
+                            updateField("location", e.target.value)
+                          }
+                          placeholder="Lucknow, Uttar Pradesh"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="modern-field">
+                      <span>People</span>
+
+                      <div className="input-with-icon">
+                        <Users size={17} />
+
+                        <input
+                          value={form.people}
+                          onChange={(e) =>
+                            updateField("people", e.target.value)
+                          }
+                          placeholder="Friends, family, classmates..."
+                        />
+                      </div>
+                    </label>
+
+                  </div>
+
+                  <label className="modern-field">
+
+                    <div className="textarea-heading">
+                      <span>
+                        Tell the memory in your own words <b>*</b>
+                      </span>
+
+                      <small>
+                        {form.description.length} characters
+                      </small>
+                    </div>
+
+                    <textarea
+                      required
+                      rows="10"
+                      value={form.description}
+                      onChange={(e) =>
+                        updateField("description", e.target.value)
+                      }
+                      placeholder="What happened? Who was there? What made you laugh? Was there a small moment you'll never forget? What were you feeling? Tell us everything you remember..."
+                    />
+
+                  </label>
+
+                  <div className="ai-writing-tip">
+                    <div>
+                      <WandSparkles size={17} />
+                    </div>
+
+                    <p>
+                      <strong>You don't need to write beautifully.</strong>
+                      <br />
+                      The more honest little details you share, the more
+                      personal your final creation will feel.
+                    </p>
+                  </div>
+
+                </div>
+
+              </section>
+
+
+              {/* PHOTOS */}
+
+              <section className="create-modern-section">
+
+                <div className="modern-section-heading">
+
+                  <div className="section-number">
+                    02
+                  </div>
+
+                  <div>
+                    <span>THE VISUAL MEMORY</span>
+                    <h2>Bring the moments to life.</h2>
+                    <p>
+                      Add photographs that belong to this memory.
+                    </p>
+                  </div>
+
+                  <strong className="modern-photo-count">
+                    {images.length}/{MAX_IMAGES}
+                  </strong>
+
+                </div>
+
+                <label
+                  className={`modern-upload ${
+                    dragging ? "dragging" : ""
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
                 >
-                  <img
-                    src={URL.createObjectURL(image)}
-                    alt={image.name}
+
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={handleFileChange}
                   />
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      removeImage(index)
-                    }
-                    aria-label={`Remove ${image.name}`}
-                  >
-                    ×
-                  </button>
+                  <div className="upload-orbit">
+                    <ImagePlus size={27} />
+                  </div>
+
+                  <strong>
+                    {dragging
+                      ? "Drop your memories here"
+                      : "Drop your photographs here"}
+                  </strong>
 
                   <span>
-                    {index + 1}
+                    or <u>browse from your computer</u>
                   </span>
+
+                  <small>
+                    JPG, PNG or WEBP · Maximum 5 MB each · Up to 50 photos
+                  </small>
+
+                </label>
+
+                {previews.length > 0 && (
+                  <div className="modern-photo-grid">
+
+                    {previews.map(({ file, url }, index) => (
+                      <div
+                        className="modern-photo"
+                        key={`${file.name}-${index}`}
+                      >
+
+                        <img src={url} alt={file.name} />
+
+                        <span className="photo-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X size={14} />
+                        </button>
+
+                      </div>
+                    ))}
+
+                    {images.length < MAX_IMAGES && (
+                      <label className="add-more-photo">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          onChange={handleFileChange}
+                        />
+
+                        <PlusIcon />
+
+                        <span>Add more</span>
+                      </label>
+                    )}
+
+                  </div>
+                )}
+
+              </section>
+
+
+              {/* FORMAT */}
+
+              <section className="create-modern-section">
+
+                <div className="modern-section-heading">
+
+                  <div className="section-number">
+                    03
+                  </div>
+
+                  <div>
+                    <span>CREATIVE FORMAT</span>
+                    <h2>How should your memory feel?</h2>
+                    <p>
+                      Choose the form that best matches the memory.
+                    </p>
+                  </div>
+
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
 
-        {/* SUBMIT */}
-        <section className="create-action">
-          <div>
-            <strong>
-              Ready to turn this memory into something
-              special?
-            </strong>
+                <div className="modern-format-grid">
 
-            <span>
-              AI will understand your memory first and
-              then create the selected format.
-            </span>
+                  {types.map((type) => {
+
+                    const Icon = type.icon;
+
+                    const selected =
+                      form.outputType === type.value;
+
+                    return (
+                      <label
+                        key={type.value}
+                        className={`modern-format-card ${
+                          selected ? "selected" : ""
+                        }`}
+                      >
+
+                        <input
+                          type="radio"
+                          name="outputType"
+                          value={type.value}
+                          checked={selected}
+                          onChange={(e) =>
+                            updateField(
+                              "outputType",
+                              e.target.value
+                            )
+                          }
+                        />
+
+                        <div className="format-top">
+
+                          <span className="format-number">
+                            {type.number}
+                          </span>
+
+                          <span className="format-check">
+                            {selected ? (
+                              <CheckCircle2 size={19} />
+                            ) : (
+                              <Icon size={19} />
+                            )}
+                          </span>
+
+                        </div>
+
+                        <Icon className="format-main-icon" size={28} />
+
+                        <h3>{type.title}</h3>
+
+                        <strong>{type.short}</strong>
+
+                        <p>{type.desc}</p>
+
+                        <div className="format-arrow">
+                          <ArrowRight size={16} />
+                        </div>
+
+                      </label>
+                    );
+                  })}
+
+                </div>
+
+              </section>
+
+
+              {/* CREATE */}
+
+              <section className="create-final-card">
+
+                <div className="final-spark">
+                  <Sparkles size={22} />
+                </div>
+
+                <div className="final-content">
+                  <span>READY WHEN YOU ARE</span>
+
+                  <h2>
+                    Turn this memory into
+                    <em> something special.</em>
+                  </h2>
+
+                  <p>
+                    Your photos, details and feelings will become a{" "}
+                    <strong>{selectedFormat.title}</strong>.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="ai-create-button"
+                >
+
+                  {loading ? (
+                    <>
+                      <span className="ai-spinner" />
+                      Creating your memory...
+                    </>
+                  ) : (
+                    <>
+                      <WandSparkles size={19} />
+                      Create with AI
+                      <span>✦</span>
+                    </>
+                  )}
+
+                </button>
+
+              </section>
+
+            </main>
+
+
+            {/* ================= LIVE PREVIEW ================= */}
+
+            <aside className="memory-live-preview">
+
+              <div className="live-preview-label">
+                <span className="live-dot" />
+                LIVE PREVIEW
+              </div>
+
+              <div className="preview-paper">
+
+                <div className="preview-paper-top">
+                  <span>MEMORYBOOK</span>
+                  <Sparkles size={13} />
+                </div>
+
+                <div className="preview-cover">
+
+                  {previews.length > 0 ? (
+                    <img
+                      src={previews[0].url}
+                      alt="Memory preview"
+                    />
+                  ) : (
+                    <div className="preview-placeholder">
+                      <Heart size={24} />
+                      <span>Your memory</span>
+                    </div>
+                  )}
+
+                  <div className="preview-overlay">
+                    <small>{selectedFormat.title.toUpperCase()}</small>
+
+                    <h3>
+                      {form.title || "Your memory title"}
+                    </h3>
+                  </div>
+
+                </div>
+
+                <div className="preview-details">
+
+                  {form.date && (
+                    <div>
+                      <CalendarDays size={13} />
+                      {form.date}
+                    </div>
+                  )}
+
+                  {form.location && (
+                    <div>
+                      <MapPin size={13} />
+                      {form.location}
+                    </div>
+                  )}
+
+                  {form.people && (
+                    <div>
+                      <Users size={13} />
+                      {form.people}
+                    </div>
+                  )}
+
+                </div>
+
+                <div className="preview-description">
+                  {form.description ? (
+                    <>
+                      <span>THE MEMORY</span>
+
+                      <p>
+                        {form.description.length > 170
+                          ? `${form.description.slice(0, 170)}...`
+                          : form.description}
+                      </p>
+                    </>
+                  ) : (
+                    <div className="preview-empty">
+                      Start writing your memory and
+                      <br />
+                      you'll see a preview here.
+                    </div>
+                  )}
+                </div>
+
+                <div className="preview-footer">
+                  <span>
+                    {images.length} {images.length === 1 ? "photo" : "photos"}
+                  </span>
+
+                  <span>✦</span>
+
+                  <span>{selectedFormat.title}</span>
+                </div>
+
+              </div>
+
+              <div className="preview-note">
+                <Sparkles size={14} />
+                Your final creation will be generated from
+                everything you share here.
+              </div>
+
+            </aside>
+
           </div>
 
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={isSubmitting}
-          >
-            {isSubmitting
-              ? "Creating your memory..."
-              : "Create Memory ✨"}
-          </button>
-        </section>
-      </form>
-    </main>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <span className="plus-icon">
+      +
+    </span>
   );
 }
